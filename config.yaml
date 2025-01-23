@@ -1,0 +1,47 @@
+data:
+  dataset: DS1 
+  rep_id: 1 
+  empFreq: False
+
+decoder:
+  hidden_units: 512 
+  latent_dim: 2 
+  norm: id  
+  num_layers: 2
+  resnet: True
+
+encoder:
+  hidden_dim: 100
+  num_layers: 2 
+  latent_dim: ${decoder.latent_dim}
+  gnn_type: ggnn
+  aggr: sum
+  norm: layer
+  bias: True
+
+base:
+  mode: train
+  datetime: 2024-01-01
+  folder: results
+  seed: 2024
+
+objective:
+  method: iwae
+  batch_size: 10
+  n_particles: 32
+
+optimizer:
+  enc_stepsz: 0.0003
+  dec_stepsz: 0.0003
+  scheduler: cosine
+  anneal_freq: 20000
+  anneal_rate: 0.75
+  test_freq: 1000
+  lb_freq: 5000  
+  save_freq: 50000
+  maxIter: 200000
+  ema_beta: 0.9995
+  ema_update_every: 1
+  ema_update_after_step: 5000
+
+
