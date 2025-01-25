@@ -14,6 +14,7 @@ from copy import deepcopy
 
 from utils import edgemask
 from reverse_models import GNNModel
+from torch.utils.data import DataLoader, Dataset
 
 norm_dict = {
     'id': nn.Identity,
@@ -116,6 +117,7 @@ class VAETree(nn.Module):
     def __init__(self, taxa, dataloader, emp_dataloader=None, cfg=None):
         super().__init__()
         self.ntips = len(taxa)
+        self.cfg = cfg
         self.latent_dim = cfg.decoder.latent_dim
         
         self.dataloader = dataloader
@@ -152,6 +154,19 @@ class VAETree(nn.Module):
             lower_bound.append(self.multi_sample_lower_bound(node_features.unsqueeze(0), edge_index.unsqueeze(0), vec.unsqueeze(0), n_particles))
         return np.sum(self.dataloader.dataset.wts * torch.stack(lower_bound).squeeze().cpu().numpy())
     
+    @torch.no_grad()
+    def compute_rep(self):
+        loader = DataLoader(self.dataloader.dataset, batch_size=self.cfg.objective.batch_size)
+        representations = []
+        with tqdm.tqdm(total=len(self.dataloader.dataset)) as pbar:
+            for i, (node_features, edge_index, vec) in enumerate(loader):
+                pbar.update(node_features.shape[0])
+                mean, std = self.encoder(node_features, edge_index)
+                representations.append(mean)
+        representations = torch.concat(representations, dim=0)
+        representations = representations.cpu().numpy()
+        return representations
+
     def iwae_loss(self, n_particles):
         node_features, edge_index, vec = self.dataloader.next()
         return self.multi_sample_lower_bound(node_features, edge_index, vec, n_particles).mean(0)
@@ -176,71 +191,73 @@ class VAETree(nn.Module):
         scheduler = get_scheduler(optimizer, optimizer_cfg)
         run_time = -time.time()
         ema = EMA(self, beta=cfg.optimizer.ema_beta, update_every=cfg.optimizer.ema_update_every, update_after_step=cfg.optimizer.ema_update_after_step)
-        for i, data in tqdm.tqdm(enumerate(self.dataloader)):
-            it = i + 1
-            node_features, edge_index, vec = data
-            node_features, edge_index, vec = node_features.to(cfg.base.device), edge_index.to(cfg.base.device), vec.to(cfg.base.device)
-            if objective_cfg.method == 'iwae':
-                lb = self.multi_sample_lower_bound(node_features, edge_index, vec, cfg.objective.n_particles).mean(0)
-            else:
-                raise NotImplementedError
-                
-            lbs.append(lb.item())
-                
-            optimizer.zero_grad()
-            (-lb).backward()
-            optimizer.step()
-            scheduler.step()
-            ema.update()
-
-            gradnorm = torch.nn.utils.clip_grad.clip_grad_norm_(self.parameters(), max_norm=float('inf'), error_if_nonfinite=True)
-            gradnorms.append(gradnorm.item())
-
-            if it % optimizer_cfg.test_freq == 0:
-                run_time += time.time()
-                times.append(run_time)
-                memory = psutil.Process(os.getpid()).memory_info().rss/1024/1024
-                logger.info('{} Iter {}:({:.1f}s) Lower Bound: {:.4f} | GradNorm: {:.4f} | Memory: {:.4f} MB'.format(time.asctime(time.localtime(time.time())), it, run_time, np.mean(lbs), np.mean(gradnorms), memory))
-                gc.collect()
-
-                tb_logger.add_scalar('MLB', lb.item(), it)
-                tb_logger.add_scalar('Gradient Norm', gradnorm.item(), it)
-                tb_logger.add_scalar('Memory', memory, it)
-                for idx, p in enumerate(optimizer.param_groups):
-                    tb_logger.add_scalar('lr_param_group_{}'.format(idx + 1), p['lr'], it)
-
-                if it % optimizer_cfg.lb_freq == 0:
-                    run_time = -time.time()
-                    self.eval()
-                    test_lbs.append(self.lower_bound_batch())
-                    if self.emp_dataloader:
-                        test_kls.append(self.kl_div()[0])
-                    current_state_dict = deepcopy(self.state_dict())
-                    self.load_state_dict(ema.ema_model.state_dict())
-                    ema_test_lbs.append(self.lower_bound_batch())
-                    if self.emp_dataloader:
-                        ema_test_kls.append(self.kl_div()[0])
-                    self.load_state_dict(current_state_dict)
-                    gc.collect()
+        with tqdm.tqdm(total=self.cfg.optimizer.maxIter) as pbar:
+            for i, data in enumerate(self.dataloader):
+                pbar.update(1)
+                it = i + 1
+                node_features, edge_index, vec = data
+                node_features, edge_index, vec = node_features.to(cfg.base.device), edge_index.to(cfg.base.device), vec.to(cfg.base.device)
+                if objective_cfg.method == 'iwae':
+                    lb = self.multi_sample_lower_bound(node_features, edge_index, vec, cfg.objective.n_particles).mean(0)
+                else:
+                    raise NotImplementedError
                     
-                    self.train()
+                lbs.append(lb.item())
+                    
+                optimizer.zero_grad()
+                (-lb).backward()
+                optimizer.step()
+                scheduler.step()
+                ema.update()
+
+                gradnorm = torch.nn.utils.clip_grad.clip_grad_norm_(self.parameters(), max_norm=float('inf'), error_if_nonfinite=True)
+                gradnorms.append(gradnorm.item())
+
+                if it % optimizer_cfg.test_freq == 0:
                     run_time += time.time()
-                    if self.emp_dataloader:
-                        logger.info('>>> Iter {}:({:.1f}s) Lower Bound: {:.4f} | KL Div: {:.4f} | EMA Lower Bound: {:.4f} | EMA KL Div: {:.4f}'.format(it, run_time, test_lbs[-1], test_kls[-1], ema_test_lbs[-1], ema_test_kls[-1]))
-                        tb_logger.add_scalar('MLB (K=1000)', test_lbs[-1], it)
-                        tb_logger.add_scalar('KL', test_kls[-1], it)
-                        tb_logger.add_scalar('EMA MLB (K=1000)', ema_test_lbs[-1], it)
-                        tb_logger.add_scalar('EMA KL', ema_test_kls[-1], it)
-                    else:
-                        logger.info('>>> Iter {}:({:.1f}s) Lower Bound: {:.4f} | EMA Lower Bound: {:.4f}'.format(it, run_time, test_lbs[-1], ema_test_lbs[-1]))
-                        tb_logger.add_scalar('MLB (K=1000)', test_lbs[-1], it)
-                        tb_logger.add_scalar('EMA MLB (K=1000)', ema_test_lbs[-1], it)
+                    times.append(run_time)
+                    memory = psutil.Process(os.getpid()).memory_info().rss/1024/1024
+                    logger.info('{} Iter {}:({:.1f}s) Lower Bound: {:.4f} | GradNorm: {:.4f} | Memory: {:.4f} MB'.format(time.asctime(time.localtime(time.time())), it, run_time, np.mean(lbs), np.mean(gradnorms), memory))
+                    gc.collect()
 
-                run_time = -time.time()
-                lbs, gradnorms = [], []
+                    tb_logger.add_scalar('MLB', lb.item(), it)
+                    tb_logger.add_scalar('Gradient Norm', gradnorm.item(), it)
+                    tb_logger.add_scalar('Memory', memory, it)
+                    for idx, p in enumerate(optimizer.param_groups):
+                        tb_logger.add_scalar('lr_param_group_{}'.format(idx + 1), p['lr'], it)
 
-            if it % optimizer_cfg.save_freq == 0:
-                torch.save({'model': self.state_dict(), 'ema': ema.ema_model.state_dict()}, cfg.base.save_to_path.replace('final', str(it)))
+                    if it % optimizer_cfg.lb_freq == 0:
+                        run_time = -time.time()
+                        self.eval()
+                        test_lbs.append(self.lower_bound_batch())
+                        if self.emp_dataloader:
+                            test_kls.append(self.kl_div()[0])
+                        current_state_dict = deepcopy(self.state_dict())
+                        self.load_state_dict(ema.ema_model.state_dict())
+                        ema_test_lbs.append(self.lower_bound_batch())
+                        if self.emp_dataloader:
+                            ema_test_kls.append(self.kl_div()[0])
+                        self.load_state_dict(current_state_dict)
+                        gc.collect()
+                        
+                        self.train()
+                        run_time += time.time()
+                        if self.emp_dataloader:
+                            logger.info('>>> Iter {}:({:.1f}s) Lower Bound: {:.4f} | KL Div: {:.4f} | EMA Lower Bound: {:.4f} | EMA KL Div: {:.4f}'.format(it, run_time, test_lbs[-1], test_kls[-1], ema_test_lbs[-1], ema_test_kls[-1]))
+                            tb_logger.add_scalar('MLB (K=1000)', test_lbs[-1], it)
+                            tb_logger.add_scalar('KL', test_kls[-1], it)
+                            tb_logger.add_scalar('EMA MLB (K=1000)', ema_test_lbs[-1], it)
+                            tb_logger.add_scalar('EMA KL', ema_test_kls[-1], it)
+                        else:
+                            logger.info('>>> Iter {}:({:.1f}s) Lower Bound: {:.4f} | EMA Lower Bound: {:.4f}'.format(it, run_time, test_lbs[-1], ema_test_lbs[-1]))
+                            tb_logger.add_scalar('MLB (K=1000)', test_lbs[-1], it)
+                            tb_logger.add_scalar('EMA MLB (K=1000)', ema_test_lbs[-1], it)
+
+                    run_time = -time.time()
+                    lbs, gradnorms = [], []
+
+                if it % optimizer_cfg.save_freq == 0:
+                    torch.save({'model': self.state_dict(), 'ema': ema.ema_model.state_dict()}, cfg.base.save_to_path.replace('final', str(it)))
             
         torch.save({'model': self.state_dict(), 'ema': ema.ema_model.state_dict()}, cfg.base.save_to_path)
                 

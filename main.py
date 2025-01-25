@@ -49,6 +49,9 @@ def main(cfg):
     elif base_cfg.mode == 'test':
         logger.info('Testing with the following settings:')
         logger.info(OmegaConf.to_yaml(cfg))
+    elif base_cfg.mode == 'rep':
+        logger.info('Building representations with the following settings:')
+        logger.info(OmegaConf.to_yaml(cfg))
     else: 
         raise NotImplementedError(base_cfg.mode)
 
@@ -64,7 +67,7 @@ def main(cfg):
     model = VAETree(taxa, dataloader, emp_dataloader, cfg=cfg).to(device=cfg.base.device)
 
     if base_cfg.mode == 'train':
-        logger.info('\nTreeVAE running, results will be saved to: {}\n'.format(base_cfg.save_to_path))
+        logger.info('\nPhyloVAE running, results will be saved to: {}\n'.format(base_cfg.save_to_path))
         logger.info('Entropy of training data: {:.4f}\n'.format(np.sum(dataloader.dataset.wts*np.log(dataloader.dataset.wts))))
         
         test_lbs, test_kls, ema_test_lbs, ema_test_kls, times = model.learn(cfg=cfg, logger=logger, tb_logger=tb_logger)
@@ -75,7 +78,7 @@ def main(cfg):
         np.save(base_cfg.save_to_path.replace('.pt', '_ema_test_kls.npy'), ema_test_kls)
         np.save(base_cfg.save_to_path.replace('.pt', '_times.npy'), times)
     elif base_cfg.mode == 'test':
-        logger.info('\nTreeVAE testing, results will be saved to: {}\n'.format(base_cfg.save_to_path))
+        logger.info('\nPhyloVAE testing, results will be saved to: {}\n'.format(base_cfg.save_to_path))
         
         for key in ['ema', 'model']:
             model.load_state_dict(torch.load(base_cfg.save_to_path)[key])
@@ -90,9 +93,12 @@ def main(cfg):
                     mlls = np.array([model.lower_bound_batch() for _ in range(50)])
                     np.save(base_cfg.save_to_path.replace('final.pt', key+'_mlls.npy'), mlls)
                     logger.info('\nThe {} marginal likelihood evaluation is finished. Mean: {:.4f} Std: {:.4f}'.format(key, np.mean(mlls), np.std(mlls)))
-
-        
-
+    elif base_cfg.mode == 'rep':
+        # for key in ['ema', 'model']:
+        model.load_state_dict(torch.load(base_cfg.save_to_path)['ema'])
+        model.eval()
+        representations = model.compute_rep()
+        np.savetxt(base_cfg.save_to_path.replace('.pt', '_representations.txt'), representations)
 
 
 
