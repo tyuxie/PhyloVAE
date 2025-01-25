@@ -70,17 +70,19 @@ python main.py base.mode=test data.dataset=$DATASET data.rep_id=$REP_ID data.emp
 ## Instruction for Building Tree Topology Representations
 To obtain the representations of a set of tree topologies using PhyloVAE, consider the following steps:
 1. Gather the tree topologies you are interested in in an ```.trprobs``` file, which is usually the output file of MrBayes. It should be putted at ```data/short_run_data/$DATASET/rep_1/$DATASET.trprobs```.
+   
 2. Run the command 
-  ```
-  python -c '''from datasets import process_data; process_data($DATASET, 1);'''
-  python main.py base.mode=train data.dataset=$DATASET data.rep_id=1 decoder.num_layers=2 decoder.latent_dim=2 objective.batch_size=10 objective.n_particles=32 base.datetime=20XX-XX-XX-rep
-  ```
-  to construct the training set and train the PhyloVAE model on it.
+```
+python -c '''from datasets import process_data; process_data($DATASET, 1);'''
+python main.py base.mode=train data.dataset=$DATASET data.rep_id=1 decoder.num_layers=2 decoder.latent_dim=2 objective.batch_size=10 objective.n_particles=32 base.datetime=20XX-XX-XX-rep
+```
+to construct the training set and train the PhyloVAE model on it.
+
 3. Run the command
-  ```
-  python main.py base.mode=rep data.dataset=$DATASET data.rep_id=1 decoder.num_layers=2 decoder.latent_dim=2 objective.batch_size=10 objective.n_particles=32 base.datetime=20XX-XX-XX-rep
-  ```
-  to obtain the represetations of the tree topologies in the training set. This will outputs a ```.txt``` file which includes the 2D representations of the tree topologies in the ```.trprobs``` file. You can then choose your favorite tool to visualize the representations or use them for downstream tasks.
+```
+python main.py base.mode=rep data.dataset=$DATASET data.rep_id=1 decoder.num_layers=2 decoder.latent_dim=2 objective.batch_size=10 objective.n_particles=32 base.datetime=20XX-XX-XX-rep
+```
+to obtain the represetations of the tree topologies in the training set. This will outputs a ```.txt``` file which includes the 2D representations of the tree topologies in the ```.trprobs``` file. You can then choose your favorite tool to visualize the representations or use them for downstream tasks.
   
 You can skip step 2 if you have a pre-trained PhyloVAE model. For more details about the training and evaluation configuratiion, please refer to **Instruction for Tree Topology Density Estimation**.
 

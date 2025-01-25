@@ -12,8 +12,8 @@ import tqdm
 from ema_pytorch import EMA
 from copy import deepcopy
 
-from utils import edgemask
-from reverse_models import GNNModel
+from src.utils import edgemask
+from src.reverse_models import GNNModel
 from torch.utils.data import DataLoader, Dataset
 
 norm_dict = {

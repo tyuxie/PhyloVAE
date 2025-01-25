@@ -2,8 +2,8 @@ import torch
 import numpy as np
 import os
 from torch.utils.data import Dataset
-from utils import mcmc_treeprob, namenum, summary
-from vector_representation import tree2vec
+from src.utils import mcmc_treeprob, namenum, summary
+from src.vector_representation import tree2vec
 
 def node_embedding(tree, ntips):
     leaf_features = torch.eye(ntips)

@@ -7,9 +7,9 @@ import os
 import random
 from omegaconf import OmegaConf
 
-from tb_logging import TensorboardLogger as TBLogger
-from latent_tree_model import VAETree
-from datasets import EmbedData
+from src.tb_logging import TensorboardLogger as TBLogger
+from src.latent_tree_model import VAETree
+from src.datasets import EmbedData
 import tqdm
 
 def get_cfg():

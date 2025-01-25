@@ -5,7 +5,7 @@ import copy
 from Bio import Phylo
 from io import StringIO
 from ete3 import Tree
-from treeManipulation import init, namenum
+from src.treeManipulation import init, namenum
 from collections import defaultdict, OrderedDict
 import pdb
 
