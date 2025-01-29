@@ -16,8 +16,8 @@ Tianyu Xie, Harry Richman, Jiansi Gao, Frederick A Matsen IV, Cheng Zhang
 This repository is a light CPU-based implementation of PhyloVAE.
 To create the torch environment, use the following command:
 ```
-conda env create -f environment.yml
-conda activate phyloinfer
+conda env create -f environment.yaml
+conda activate phylovae
 ```
 
 ## Instruction for Tree Topology Density Estimation
@@ -25,13 +25,13 @@ conda activate phyloinfer
 Before starting your training, the training dataset should be constructed by running the command
 ```
 python -c '''
-from datasets import process_data; process_data($DATASET, $REP_ID);
+from src.datasets import process_data; process_data($DATASET, $REP_ID);
 '''
 ```
 and the ground truth should be constructed by running the command
 ```
 python -c '''
-from datasets import process_empFreq; process_empFreq($DATASET);
+from src.datasets import process_empFreq; process_empFreq($DATASET);
 '''
 ```
 The ```$DATASET``` is a string value refering to the name of the dataset, and the ```$REP_ID``` is an integer indicating the index of the phylogenetic analysis (since multiple analysis is a common practice to derive reliable results).
@@ -60,11 +60,11 @@ You can also consider unsupervised learning on other data sets, as long as you h
 ### Evaluation
 Once the training is finished, you can use the following command to compute the marginal likelihood on training set by
 ```
-python main.py base.mode=test data.dataset=$DATASET data.rep_id=$REP_ID
+python main.py base.mode=test data.dataset=$DATASET data.rep_id=$REP_ID decoder.num_layers=4 decoder.latent_dim=2 objective.batch_size=10 objective.n_particles=32
 ```
 and compute the KL divergence to the ground truth by
 ```
-python main.py base.mode=test data.dataset=$DATASET data.rep_id=$REP_ID data.empFreq=True
+python main.py base.mode=test data.dataset=$DATASET data.rep_id=$REP_ID data.empFreq=True decoder.num_layers=4 decoder.latent_dim=2 objective.batch_size=10 objective.n_particles=32
 ```
 
 ## Instruction for Building Tree Topology Representations
@@ -73,7 +73,7 @@ To obtain the representations of a set of tree topologies using PhyloVAE, consid
    
 2. Run the command 
 ```
-python -c '''from datasets import process_data; process_data($DATASET, 1);'''
+python -c '''from src.datasets import process_data; process_data($DATASET, 1);'''
 python main.py base.mode=train data.dataset=$DATASET data.rep_id=1 decoder.num_layers=2 decoder.latent_dim=2 objective.batch_size=10 objective.n_particles=32 base.datetime=20XX-XX-XX-rep
 ```
 to construct the training set and train the PhyloVAE model on it.

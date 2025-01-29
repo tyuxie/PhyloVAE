@@ -14,5 +14,6 @@ dependencies:
   - pytorch=2.1
   - tensorboard=2.15
   - tqdm=4.65
+  - psutil=5.9
   - pip:
     - ema-pytorch==0.3
