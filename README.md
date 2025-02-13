@@ -3,7 +3,7 @@
 ### <div align="center"> ICLR 2025 Poster <div> 
 
 <div align="center">
-  <a href="https://arxiv.org/abs/XX"><img src="https://img.shields.io/static/v1?label=Paper&message=arXiv&color=red&logo=arxiv"></a> &ensp;
+  <a href="https://arxiv.org/abs/2502.04730"><img src="https://img.shields.io/static/v1?label=Paper&message=arXiv&color=red&logo=arxiv"></a> &ensp;
   <a href="https://openreview.net/forum?id=Z8TglKXDWm"><img src="https://img.shields.io/static/v1?label=Paper&message=OpenReview&color=red&logo=openreview"></a> &ensp;
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg"></a> &ensp;
 </div>
