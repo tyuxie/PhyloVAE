@@ -7,7 +7,7 @@ decoder:
   hidden_units: 512 
   latent_dim: 2 
   norm: id  
-  num_layers: 2
+  num_layers: 4
   resnet: True
 
 encoder:
